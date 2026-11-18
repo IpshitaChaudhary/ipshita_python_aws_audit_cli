@@ -10,7 +10,7 @@ from aws_audit.runner import ScanResult
 
 def _table(headers: list[str], rows: list[list[str]]) -> str:
     widths = [max([len(h), *(len(r[i]) for r in rows)]) for i, h in enumerate(headers)]
-    lines = ["  ".join(h.upper().ljust(w) for h, w in zip(headers, widths, strict=True))]
+    lines = ["  ".join(h.upper().ljust(w) for h, w in zip(headers, widths, strict=True)).rstrip()]
     lines.append("  ".join("-" * w for w in widths))
     lines += ["  ".join(c.ljust(w) for c, w in zip(r, widths, strict=True)).rstrip() for r in rows]
     return "\n".join(lines)
