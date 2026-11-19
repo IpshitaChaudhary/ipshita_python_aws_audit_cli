@@ -116,3 +116,70 @@ def test_unattached_volume(aws):
 
     assert [i.resource for i in issues] == [loose["VolumeId"]]
     assert "20 GiB gp3" in issues[0].message
+
+
+def test_sg_admin_ports(aws):
+    from aws_audit.checks.ec2 import sg_admin_ports
+    from aws_audit.models import Severity
+
+    ec2 = aws.client("ec2", region_name=REGION)
+    vpc = ec2.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]["VpcId"]
+
+    def sg(name, perms):
+        gid = ec2.create_security_group(GroupName=name, Description=name, VpcId=vpc)["GroupId"]
+        ec2.authorize_security_group_ingress(GroupId=gid, IpPermissions=perms)
+        return gid
+
+    ssh = sg(
+        "ssh-world",
+        [
+            {
+                "IpProtocol": "tcp",
+                "FromPort": 22,
+                "ToPort": 22,
+                "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+            }
+        ],
+    )
+    sg(
+        "https-world",
+        [
+            {
+                "IpProtocol": "tcp",
+                "FromPort": 443,
+                "ToPort": 443,
+                "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+            }
+        ],
+    )
+    sg(
+        "db-office",
+        [
+            {
+                "IpProtocol": "tcp",
+                "FromPort": 5432,
+                "ToPort": 5432,
+                "IpRanges": [{"CidrIp": "203.0.113.10/32"}],
+            }
+        ],
+    )
+    wide = sg(
+        "range-v6",
+        [
+            {
+                "IpProtocol": "tcp",
+                "FromPort": 3000,
+                "ToPort": 7000,
+                "Ipv6Ranges": [{"CidrIpv6": "::/0"}],
+            }
+        ],
+    )
+    allt = sg("all-traffic", [{"IpProtocol": "-1", "IpRanges": [{"CidrIp": "0.0.0.0/0"}]}])
+
+    issues = {i.resource.split(" ")[0]: i for i in sg_admin_ports(aws, REGION)}
+
+    assert set(issues) == {ssh, wide, allt}
+    assert "22 (SSH)" in issues[ssh].message
+    assert "3306 (MySQL)" in issues[wide].message and "6379 (Redis)" in issues[wide].message
+    assert "22 (SSH)" not in issues[wide].message
+    assert issues[allt].severity is Severity.CRITICAL

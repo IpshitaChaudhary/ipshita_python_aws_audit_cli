@@ -99,3 +99,48 @@ def unattached_volumes(session: boto3.Session, region: str) -> Iterator[Issue]:
                 f"{vol['Size']} GiB {vol['VolumeType']} volume is not attached "
                 f"(created {created}); it is billed until deleted",
             )
+
+
+# Ports that should never be reachable from the whole internet.
+ADMIN_PORTS = {
+    22: "SSH",
+    3389: "RDP",
+    3306: "MySQL",
+    5432: "PostgreSQL",
+    1433: "SQL Server",
+    27017: "MongoDB",
+    6379: "Redis",
+    9200: "Elasticsearch",
+}
+_OPEN = ("0.0.0.0/0", "::/0")
+
+
+def _covers(rule: dict, port: int) -> bool:
+    if rule.get("IpProtocol") == "-1":  # all traffic
+        return True
+    lo, hi = rule.get("FromPort"), rule.get("ToPort")
+    return lo is not None and hi is not None and lo <= port <= hi
+
+
+@check(
+    "ec2.sg-admin-port-open",
+    "Security groups do not open admin or database ports to the internet",
+    Severity.HIGH,
+)
+def sg_admin_ports(session: boto3.Session, region: str) -> Iterator[Issue]:
+    ec2 = session.client("ec2", region_name=region)
+    for page in ec2.get_paginator("describe_security_groups").paginate():
+        for sg in page["SecurityGroups"]:
+            for rule in sg.get("IpPermissions", []):
+                sources = [r["CidrIp"] for r in rule.get("IpRanges", [])]
+                sources += [r["CidrIpv6"] for r in rule.get("Ipv6Ranges", [])]
+                open_to = [c for c in sources if c in _OPEN]
+                if not open_to:
+                    continue
+                ports = [f"{p} ({n})" for p, n in ADMIN_PORTS.items() if _covers(rule, p)]
+                if ports:
+                    yield Issue(
+                        f"{sg['GroupId']} ({sg.get('GroupName', '')})",
+                        f"{', '.join(ports)} open to {', '.join(open_to)}",
+                        Severity.CRITICAL if rule.get("IpProtocol") == "-1" else None,
+                    )
