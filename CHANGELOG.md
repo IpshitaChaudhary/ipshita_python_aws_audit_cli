@@ -4,6 +4,7 @@
 
 ### Added
 - `ec2.sg-admin-port-open`: admin and database ports open to the internet.
+- `rds.publicly-accessible`, `rds.storage-unencrypted`.
 
 ## 0.2.0
 

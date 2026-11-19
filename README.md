@@ -19,6 +19,8 @@ so it is safe to run against production.
 | `ec2.sg-admin-port-open` | high | region | SSH, RDP or database ports open to `0.0.0.0/0` or `::/0`; **critical** for all-traffic rules |
 | `cloudtrail.region-not-logged` | high | region | no trail, or no *logging* trail, covers the region |
 | `config.recorder-off` | medium | region | AWS Config recorder missing or stopped |
+| `rds.publicly-accessible` | high | region | RDS instances with a public endpoint |
+| `rds.storage-unencrypted` | high | region | RDS instances without storage encryption |
 | `iam.root-mfa` | critical | global | root user without MFA |
 | `iam.access-key-old` | medium | global | active access keys older than 90 days |
 | `iam.access-key-unused` | medium | global | active access keys unused for 90 days (or never used) |
@@ -86,7 +88,7 @@ The AWS managed policy `SecurityAudit` covers every check. The exact calls are:
 `ec2:GetEbsEncryptionByDefault`, `sts:GetCallerIdentity`, `s3:ListAllMyBuckets`,
 `s3:GetAccountPublicAccessBlock`, `s3:GetBucketPublicAccessBlock`, `s3:GetBucketPolicyStatus`,
 `ec2:DescribeAddresses`, `ec2:DescribeSecurityGroups`, `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus`,
-`config:DescribeConfigurationRecorderStatus`, `iam:GetAccountSummary`, `iam:ListUsers`,
+`config:DescribeConfigurationRecorderStatus`, `rds:DescribeDBInstances`, `iam:GetAccountSummary`, `iam:ListUsers`,
 `iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`.
 
 ## Development
