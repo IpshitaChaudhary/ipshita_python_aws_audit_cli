@@ -86,3 +86,33 @@ def test_scan_ec2_end_to_end(aws, capsys):
     assert code == 1  # high-severity IMDS finding fails the default --fail-on high
     assert '"ec2.imdsv2-not-required"' in out
     assert main(["scan", "--region", REGION, "--check", "ec2", "--fail-on", "critical"]) == 0
+
+
+def test_unattached_eip(aws):
+    from aws_audit.checks.ec2 import unattached_eips
+
+    ec2 = aws.client("ec2", region_name=REGION)
+    idle = ec2.allocate_address(Domain="vpc")
+    used = ec2.allocate_address(Domain="vpc")
+    iid = _instance(ec2, "web")
+    ec2.associate_address(AllocationId=used["AllocationId"], InstanceId=iid)
+
+    issues = list(unattached_eips(aws, REGION))
+
+    assert [i.resource for i in issues] == [idle["AllocationId"]]
+    assert idle["PublicIp"] in issues[0].message
+
+
+def test_unattached_volume(aws):
+    from aws_audit.checks.ec2 import unattached_volumes
+
+    ec2 = aws.client("ec2", region_name=REGION)
+    loose = ec2.create_volume(AvailabilityZone=f"{REGION}a", Size=20, VolumeType="gp3")
+    iid = _instance(ec2, "db")
+    used = ec2.create_volume(AvailabilityZone=f"{REGION}a", Size=10, VolumeType="gp3")
+    ec2.attach_volume(VolumeId=used["VolumeId"], InstanceId=iid, Device="/dev/sdf")
+
+    issues = list(unattached_volumes(aws, REGION))
+
+    assert [i.resource for i in issues] == [loose["VolumeId"]]
+    assert "20 GiB gp3" in issues[0].message
