@@ -70,3 +70,32 @@ def imdsv2_not_required(session: boto3.Session, region: str) -> Iterator[Issue]:
                         "IMDSv1 is still allowed (HttpTokens is not 'required'); an SSRF bug "
                         "in the app could read the instance role's credentials",
                     )
+
+
+@check("ec2.unattached-eip", "Elastic IPs are attached to something", Severity.LOW)
+def unattached_eips(session: boto3.Session, region: str) -> Iterator[Issue]:
+    ec2 = session.client("ec2", region_name=region)
+    for addr in ec2.describe_addresses()["Addresses"]:
+        if addr.get("AssociationId") or addr.get("NetworkInterfaceId"):
+            continue
+        yield Issue(
+            _label(addr.get("AllocationId", addr.get("PublicIp", "?")), addr.get("Tags")),
+            f"Elastic IP {addr.get('PublicIp')} is not attached; "
+            "idle public IPv4 addresses are billed",
+        )
+
+
+@check("ec2.unattached-volume", "EBS volumes are attached to an instance", Severity.LOW)
+def unattached_volumes(session: boto3.Session, region: str) -> Iterator[Issue]:
+    ec2 = session.client("ec2", region_name=region)
+    pages = ec2.get_paginator("describe_volumes").paginate(
+        Filters=[{"Name": "status", "Values": ["available"]}]
+    )
+    for page in pages:
+        for vol in page["Volumes"]:
+            created = vol["CreateTime"].date().isoformat()
+            yield Issue(
+                _label(vol["VolumeId"], vol.get("Tags")),
+                f"{vol['Size']} GiB {vol['VolumeType']} volume is not attached "
+                f"(created {created}); it is billed until deleted",
+            )
