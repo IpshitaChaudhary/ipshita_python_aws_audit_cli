@@ -16,6 +16,7 @@ so it is safe to run against production.
 | `s3.public-access` | high | global | Block Public Access gaps; **critical** when a bucket policy is public and not blocked |
 | `ec2.unattached-eip` | low | region | Elastic IPs not attached to anything (billed while idle) |
 | `ec2.unattached-volume` | low | region | EBS volumes in `available` state (billed while idle) |
+| `ec2.sg-admin-port-open` | high | region | SSH, RDP or database ports open to `0.0.0.0/0` or `::/0`; **critical** for all-traffic rules |
 | `cloudtrail.region-not-logged` | high | region | no trail, or no *logging* trail, covers the region |
 | `config.recorder-off` | medium | region | AWS Config recorder missing or stopped |
 | `iam.root-mfa` | critical | global | root user without MFA |
@@ -84,7 +85,7 @@ The AWS managed policy `SecurityAudit` covers every check. The exact calls are:
 `ec2:DescribeRegions`, `ec2:DescribeVolumes`, `ec2:DescribeInstances`,
 `ec2:GetEbsEncryptionByDefault`, `sts:GetCallerIdentity`, `s3:ListAllMyBuckets`,
 `s3:GetAccountPublicAccessBlock`, `s3:GetBucketPublicAccessBlock`, `s3:GetBucketPolicyStatus`,
-`ec2:DescribeAddresses`, `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus`,
+`ec2:DescribeAddresses`, `ec2:DescribeSecurityGroups`, `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus`,
 `config:DescribeConfigurationRecorderStatus`, `iam:GetAccountSummary`, `iam:ListUsers`,
 `iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`.
 
