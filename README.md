@@ -97,7 +97,7 @@ The AWS managed policy `SecurityAudit` covers every check. The exact calls are:
 `s3:GetAccountPublicAccessBlock`, `s3:GetBucketPublicAccessBlock`, `s3:GetBucketPolicyStatus`,
 `ec2:DescribeAddresses`, `ec2:DescribeSecurityGroups`, `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus`,
 `config:DescribeConfigurationRecorderStatus`, `rds:DescribeDBInstances`, `iam:GetAccountSummary`, `iam:ListUsers`,
-`iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`, `lambda:ListFunctions`, `lambda:GetFunctionUrlConfig`.
+`iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`, `lambda:ListFunctions`, `lambda:ListAliases`, `lambda:GetFunctionUrlConfig`.
 
 ## Development
 

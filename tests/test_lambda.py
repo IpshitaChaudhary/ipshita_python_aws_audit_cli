@@ -66,6 +66,58 @@ def test_public_url_flags_auth_none_only(aws):
     assert "AuthType NONE" in issues[0].message
 
 
+class _NotFound(Exception):
+    pass
+
+
+class _StubLambda:
+    """moto ignores Qualifier on function URL calls, so aliases need a stub.
+
+    urls maps (function, qualifier or None) -> AuthType.
+    """
+
+    class exceptions:  # noqa: N801 - mirrors boto3's client.exceptions
+        ResourceNotFoundException = _NotFound
+
+    def __init__(self, aliases, urls):
+        self.aliases, self.urls = aliases, urls
+
+    def client(self, service, region_name):
+        return self
+
+    def get_paginator(self, operation):
+        return self
+
+    def paginate(self, FunctionName=None):  # noqa: N803 - boto3 parameter name
+        if FunctionName is None:
+            yield {"Functions": [{"FunctionName": f} for f in self.aliases]}
+        else:
+            yield {"Aliases": [{"Name": a} for a in self.aliases[FunctionName]]}
+
+    def get_function_url_config(self, FunctionName, Qualifier=None):  # noqa: N803
+        key = (FunctionName, Qualifier)
+        if key not in self.urls:
+            raise _NotFound()
+        url = f"https://{FunctionName}-{Qualifier or 'latest'}.lambda-url.example/"
+        return {"AuthType": self.urls[key], "FunctionUrl": url}
+
+
+def test_public_url_on_alias():
+    session = _StubLambda(
+        aliases={"checkout": ["live", "canary"], "reports": []},
+        urls={
+            ("checkout", None): "AWS_IAM",
+            ("checkout", "live"): "NONE",
+            ("checkout", "canary"): "AWS_IAM",
+            ("reports", None): "NONE",
+        },
+    )
+
+    issues = list(public_url(session, REGION))
+
+    assert sorted(i.resource for i in issues) == ["checkout:live", "reports"]
+
+
 def test_no_functions(aws):
     assert list(deprecated_runtime(aws, REGION)) == []
     assert list(public_url(aws, REGION)) == []
