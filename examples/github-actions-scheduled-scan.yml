@@ -1,0 +1,51 @@
+# Example: run aws-audit every morning against one account and show the
+# results on the workflow run page. Copy to .github/workflows/ in the repo
+# that should run the audit.
+#
+# Auth is GitHub OIDC -> an IAM role with the AWS managed policy SecurityAudit
+# attached (read-only). No long-lived access keys are stored in GitHub.
+# The role's trust policy should only allow this repo's default branch, e.g.
+#   "token.actions.githubusercontent.com:sub": "repo:<owner>/<repo>:ref:refs/heads/main"
+
+name: aws-audit
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # 03:30 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # needed for OIDC
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install aws-audit
+        run: pip install "git+https://github.com/IpshitaChaudhary/ipshita_python_aws_audit_cli@main"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AUDIT_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Scan
+        run: |
+          set +e
+          aws-audit scan --all-regions --format markdown --fail-on critical > report.md
+          code=$?
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          exit $code # 1 = a critical finding: the run goes red and GitHub notifies
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aws-audit-report
+          path: report.md
+          retention-days: 30
