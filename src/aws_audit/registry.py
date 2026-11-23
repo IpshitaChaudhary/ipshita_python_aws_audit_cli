@@ -60,17 +60,23 @@ def all_checks() -> list[Check]:
     return sorted(_REGISTRY.values(), key=lambda c: c.id)
 
 
-def select_checks(ids: Iterable[str] | None) -> list[Check]:
-    """Return the requested checks, or all of them when ids is empty.
+def _matches(check_id: str, pattern: str) -> bool:
+    return check_id == pattern or check_id.startswith(pattern + ".")
+
+
+def select_checks(ids: Iterable[str] | None, skip: Iterable[str] | None = None) -> list[Check]:
+    """Return the requested checks (all when ids is empty), minus the skipped ones.
 
     An id can be exact ("ec2.imdsv2-not-required") or a service prefix ("ec2").
+    Unknown ids in either list are an error, so a typo never silently runs or
+    skips the wrong thing.
     """
     checks = all_checks()
     wanted = [i.strip() for i in ids or [] if i.strip()]
-    if not wanted:
-        return checks
-    selected = [c for c in checks if any(c.id == w or c.id.startswith(w + ".") for w in wanted)]
-    unknown = [w for w in wanted if not any(c.id == w or c.id.startswith(w + ".") for c in checks)]
+    skipped = [i.strip() for i in skip or [] if i.strip()]
+    unknown = [w for w in wanted + skipped if not any(_matches(c.id, w) for c in checks)]
     if unknown:
         raise ValueError(f"unknown check(s): {', '.join(unknown)}")
-    return selected
+    if wanted:
+        checks = [c for c in checks if any(_matches(c.id, w) for w in wanted)]
+    return [c for c in checks if not any(_matches(c.id, s) for s in skipped)]
