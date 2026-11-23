@@ -13,7 +13,7 @@ from aws_audit import __version__
 from aws_audit.models import Severity
 from aws_audit.output import render_checks, render_json, render_markdown, render_table
 from aws_audit.registry import all_checks, select_checks
-from aws_audit.runner import enabled_regions, run_scan
+from aws_audit.runner import ScanResult, enabled_regions, run_scan
 
 EXIT_OK = 0
 EXIT_FINDINGS = 1
@@ -56,6 +56,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     scan.add_argument("--format", choices=["table", "json", "markdown"], default="table")
     scan.add_argument(
+        "--min-severity",
+        default="low",
+        metavar="SEVERITY",
+        help="only show findings at or above this severity (default: low, i.e. all)",
+    )
+    scan.add_argument(
         "--fail-on",
         default="high",
         metavar="SEVERITY",
@@ -67,6 +73,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def _scan(args: argparse.Namespace) -> int:
     try:
         fail_on = None if args.fail_on.lower() == "none" else Severity.parse(args.fail_on)
+        min_severity = Severity.parse(args.min_severity)
         checks = select_checks(args.checks, args.skip_checks)
     except ValueError as exc:
         print(f"aws-audit: {exc}", file=sys.stderr)
@@ -86,8 +93,13 @@ def _scan(args: argparse.Namespace) -> int:
         print(f"aws-audit: {exc}", file=sys.stderr)
         return EXIT_USAGE
 
+    shown = ScanResult([f for f in result.findings if f.severity >= min_severity], result.errors)
+    hidden = len(result.findings) - len(shown.findings)
+    if hidden:
+        print(f"aws-audit: {hidden} finding(s) below {min_severity} not shown", file=sys.stderr)
     renderers = {"table": render_table, "json": render_json, "markdown": render_markdown}
-    print(renderers[args.format](result))
+    print(renderers[args.format](shown))
+    # --fail-on looks at every finding, so hiding output never hides a failure
     if fail_on is not None and any(f.severity >= fail_on for f in result.findings):
         return EXIT_FINDINGS
     return EXIT_OK

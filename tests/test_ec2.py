@@ -183,3 +183,20 @@ def test_sg_admin_ports(aws):
     assert "3306 (MySQL)" in issues[wide].message and "6379 (Redis)" in issues[wide].message
     assert "22 (SSH)" not in issues[wide].message
     assert issues[allt].severity is Severity.CRITICAL
+
+
+def test_min_severity_hides_output_but_not_failures(aws, capsys):
+    aws.client("ec2", region_name=REGION).create_volume(AvailabilityZone=f"{REGION}a", Size=8)
+    # one unattached (low) and unencrypted (high) volume, plus EBS default encryption off (medium)
+
+    code = main(["scan", "--region", REGION, "--check", "ec2", "--min-severity", "high"])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "ec2.ebs-unencrypted-volume" in captured.out
+    assert "ec2.unattached-volume" not in captured.out
+    assert "2 finding(s) below high not shown" in captured.err
+
+    # hiding output never hides a failure
+    args = ["scan", "--region", REGION, "--check", "ec2.unattached-volume"]
+    assert main([*args, "--min-severity", "critical", "--fail-on", "low"]) == 1
