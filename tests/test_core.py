@@ -6,7 +6,7 @@ from botocore.exceptions import ClientError
 from aws_audit import registry
 from aws_audit.cli import main
 from aws_audit.models import Issue, Severity
-from aws_audit.output import render_json, render_table
+from aws_audit.output import render_json, render_markdown, render_table
 from aws_audit.registry import Check
 from aws_audit.runner import run_scan
 
@@ -72,6 +72,23 @@ def test_render_table_and_json():
     table = render_table(result)
     assert "r.one" in table and "1 finding(s): 1 medium" in table
     assert json.loads(render_json(result))["findings"][0]["severity"] == "medium"
+
+
+def test_render_markdown_sorts_worst_first_and_escapes_pipes():
+    checks = [
+        _fake("r.low", issues=[("vol", "minor")]),
+        _fake("r.bad", Severity.CRITICAL, issues=[("bucket|x", "very bad")]),
+    ]
+    md = render_markdown(run_scan(None, ["eu-west-1"], checks))
+    rows = [line for line in md.splitlines() if line.startswith("| ") and "`" in line]
+    assert rows[0].startswith("| critical | `r.bad`")
+    assert r"bucket\|x" in rows[0]
+    assert "**2 finding(s):** 1 critical, 1 medium" in md
+
+
+def test_render_markdown_empty():
+    md = render_markdown(run_scan(None, ["eu-west-1"], []))
+    assert "no findings" in md and "| Severity" not in md
 
 
 def test_cli_list_checks_and_bad_input(capsys):

@@ -1,4 +1,4 @@
-"""Render scan results as a plain-text table or JSON."""
+"""Render scan results as a plain-text table, JSON or Markdown."""
 
 from __future__ import annotations
 
@@ -49,3 +49,36 @@ def render_json(result: ScanResult) -> str:
         ],
     }
     return json.dumps(payload, indent=2)
+
+
+def _md_cell(text: str) -> str:
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def render_markdown(result: ScanResult) -> str:
+    """GitHub-flavoured Markdown, e.g. for $GITHUB_STEP_SUMMARY or a PR comment.
+
+    Findings are sorted worst first so the top of the table is what matters.
+    """
+    findings = sorted(result.findings, key=lambda f: (-f.severity, f.check_id, f.resource))
+    counts: dict[str, int] = {}
+    for f in findings:
+        counts[str(f.severity)] = counts.get(str(f.severity), 0) + 1
+    summary = ", ".join(f"{n} {s}" for s, n in counts.items()) or "no findings"
+    lines = ["## aws-audit results", "", f"**{len(findings)} finding(s):** {summary}", ""]
+    if findings:
+        lines += [
+            "| Severity | Check | Region | Resource | Message |",
+            "|---|---|---|---|---|",
+        ]
+        lines += [
+            f"| {f.severity} | `{f.check_id}` | {f.region} | {_md_cell(f.resource)} "
+            f"| {_md_cell(f.message)} |"
+            for f in findings
+        ]
+    if result.errors:
+        title = f"{len(result.errors)} check(s) could not run"
+        lines += ["", f"<details><summary>{title}</summary>", ""]
+        lines += [f"- `{e.check_id}` [{e.region}]: {_md_cell(e.error)}" for e in result.errors]
+        lines += ["", "</details>"]
+    return "\n".join(lines)

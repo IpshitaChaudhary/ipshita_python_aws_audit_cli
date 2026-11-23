@@ -5,6 +5,9 @@
 ### Added
 - `ec2.sg-admin-port-open`: admin and database ports open to the internet.
 - `rds.publicly-accessible`, `rds.storage-unencrypted`.
+- `lambda.deprecated-runtime`, `lambda.public-url` (unqualified function URL only; alias URLs not yet checked).
+- `--format markdown`: worst-first table for job summaries and PR comments.
+- `examples/github-actions-scheduled-scan.yml`: daily scan over OIDC with a read-only role.
 
 ## 0.2.0
 
