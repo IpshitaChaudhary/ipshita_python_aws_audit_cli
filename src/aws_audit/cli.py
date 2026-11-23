@@ -47,6 +47,13 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="ID",
         help="check id or service prefix (e.g. ec2); repeat for more (default: all)",
     )
+    scan.add_argument(
+        "--skip-check",
+        action="append",
+        dest="skip_checks",
+        metavar="ID",
+        help="check id or service prefix to leave out; repeat for more",
+    )
     scan.add_argument("--format", choices=["table", "json", "markdown"], default="table")
     scan.add_argument(
         "--fail-on",
@@ -60,7 +67,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def _scan(args: argparse.Namespace) -> int:
     try:
         fail_on = None if args.fail_on.lower() == "none" else Severity.parse(args.fail_on)
-        checks = select_checks(args.checks)
+        checks = select_checks(args.checks, args.skip_checks)
     except ValueError as exc:
         print(f"aws-audit: {exc}", file=sys.stderr)
         return EXIT_USAGE

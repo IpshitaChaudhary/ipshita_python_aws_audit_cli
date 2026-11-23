@@ -45,6 +45,17 @@ def test_select_checks_by_prefix_and_unknown(monkeypatch):
         registry.select_checks(["rds"])
 
 
+def test_select_checks_skip(monkeypatch):
+    fakes = {c.id: c for c in (_fake("ec2.a"), _fake("ec2.b"), _fake("s3.a"))}
+    monkeypatch.setattr(registry, "_REGISTRY", fakes)
+    monkeypatch.setattr(registry, "_load_builtin_checks", lambda: None)
+    assert [c.id for c in registry.select_checks(None, ["ec2.b"])] == ["ec2.a", "s3.a"]
+    assert [c.id for c in registry.select_checks(["ec2"], ["ec2.a"])] == ["ec2.b"]
+    assert [c.id for c in registry.select_checks(None, ["ec2"])] == ["s3.a"]
+    with pytest.raises(ValueError, match="unknown check"):
+        registry.select_checks(None, ["ec2.typo"])
+
+
 def test_runner_regional_global_and_errors():
     denied = ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "Describe")
     checks = [
