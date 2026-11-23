@@ -3,7 +3,7 @@
 [![ci](https://github.com/IpshitaChaudhary/ipshita_python_aws_audit_cli/actions/workflows/ci.yml/badge.svg)](https://github.com/IpshitaChaudhary/ipshita_python_aws_audit_cli/actions/workflows/ci.yml)
 
 `aws-audit` is a small Python CLI that scans an AWS account for common hardening gaps
-and prints them as a table or JSON. It only calls read-only APIs (`Describe*`, `List*`, `Get*`),
+and prints them as a table, JSON or Markdown. It only calls read-only APIs (`Describe*`, `List*`, `Get*`),
 so it is safe to run against production.
 
 ## Checks
@@ -21,6 +21,8 @@ so it is safe to run against production.
 | `config.recorder-off` | medium | region | AWS Config recorder missing or stopped |
 | `rds.publicly-accessible` | high | region | RDS instances with a public endpoint |
 | `rds.storage-unencrypted` | high | region | RDS instances without storage encryption |
+| `lambda.deprecated-runtime` | medium | region | functions on runtimes AWS no longer patches (python3.8, nodejs16.x, go1.x, ...) |
+| `lambda.public-url` | high | region | function URLs with `AuthType NONE` (anyone can invoke) |
 | `iam.root-mfa` | critical | global | root user without MFA |
 | `iam.access-key-old` | medium | global | active access keys older than 90 days |
 | `iam.access-key-unused` | medium | global | active access keys unused for 90 days (or never used) |
@@ -52,7 +54,13 @@ aws-audit scan --region eu-west-1 --check s3.public-access
 
 # JSON for other tools
 aws-audit scan --region eu-west-1 --format json > findings.json
+
+# Markdown, e.g. for a GitHub Actions job summary or a PR comment
+aws-audit scan --all-regions --format markdown >> "$GITHUB_STEP_SUMMARY"
 ```
+
+Markdown output sorts findings worst first. For a ready-made daily scan using GitHub OIDC and a
+read-only role, see [`examples/github-actions-scheduled-scan.yml`](examples/github-actions-scheduled-scan.yml).
 
 Example output (a test account with one old instance and one new bucket):
 
@@ -89,7 +97,7 @@ The AWS managed policy `SecurityAudit` covers every check. The exact calls are:
 `s3:GetAccountPublicAccessBlock`, `s3:GetBucketPublicAccessBlock`, `s3:GetBucketPolicyStatus`,
 `ec2:DescribeAddresses`, `ec2:DescribeSecurityGroups`, `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus`,
 `config:DescribeConfigurationRecorderStatus`, `rds:DescribeDBInstances`, `iam:GetAccountSummary`, `iam:ListUsers`,
-`iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`.
+`iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`, `lambda:ListFunctions`, `lambda:GetFunctionUrlConfig`.
 
 ## Development
 
