@@ -50,16 +50,24 @@ def deprecated_runtime(session: boto3.Session, region: str) -> Iterator[Issue]:
 
 @check("lambda.public-url", "Lambda function URLs require IAM auth", Severity.HIGH)
 def public_url(session: boto3.Session, region: str) -> Iterator[Issue]:
-    """Checks the function's own URL ($LATEST); URLs on aliases are not covered."""
+    """Checks the function's own URL and the URL of every alias."""
     client = session.client("lambda", region_name=region)
     for fn in _functions(session, region):
-        try:
-            url = client.get_function_url_config(FunctionName=fn["FunctionName"])
-        except client.exceptions.ResourceNotFoundException:
-            continue  # no function URL
-        if url.get("AuthType") == "NONE":
-            yield Issue(
-                fn["FunctionName"],
-                f"function URL {url['FunctionUrl']} has AuthType NONE: anyone on the "
-                "internet can invoke it",
-            )
+        name = fn["FunctionName"]
+        qualifiers: list[str | None] = [None]
+        for page in client.get_paginator("list_aliases").paginate(FunctionName=name):
+            qualifiers += [a["Name"] for a in page["Aliases"]]
+        for qualifier in qualifiers:
+            kwargs = {"FunctionName": name}
+            if qualifier:
+                kwargs["Qualifier"] = qualifier
+            try:
+                url = client.get_function_url_config(**kwargs)
+            except client.exceptions.ResourceNotFoundException:
+                continue  # no URL on this function or alias
+            if url.get("AuthType") == "NONE":
+                yield Issue(
+                    f"{name}:{qualifier}" if qualifier else name,
+                    f"function URL {url['FunctionUrl']} has AuthType NONE: anyone on the "
+                    "internet can invoke it",
+                )
