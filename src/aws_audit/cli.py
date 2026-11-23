@@ -11,7 +11,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from aws_audit import __version__
 from aws_audit.models import Severity
-from aws_audit.output import render_checks, render_json, render_table
+from aws_audit.output import render_checks, render_json, render_markdown, render_table
 from aws_audit.registry import all_checks, select_checks
 from aws_audit.runner import enabled_regions, run_scan
 
@@ -47,7 +47,7 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="ID",
         help="check id or service prefix (e.g. ec2); repeat for more (default: all)",
     )
-    scan.add_argument("--format", choices=["table", "json"], default="table")
+    scan.add_argument("--format", choices=["table", "json", "markdown"], default="table")
     scan.add_argument(
         "--fail-on",
         default="high",
@@ -79,7 +79,8 @@ def _scan(args: argparse.Namespace) -> int:
         print(f"aws-audit: {exc}", file=sys.stderr)
         return EXIT_USAGE
 
-    print(render_json(result) if args.format == "json" else render_table(result))
+    renderers = {"table": render_table, "json": render_json, "markdown": render_markdown}
+    print(renderers[args.format](result))
     if fail_on is not None and any(f.severity >= fail_on for f in result.findings):
         return EXIT_FINDINGS
     return EXIT_OK
