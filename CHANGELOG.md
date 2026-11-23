@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-11-23
 
 ### Added
 - `ec2.sg-admin-port-open`: admin and database ports open to the internet.
@@ -8,6 +8,10 @@
 - `lambda.deprecated-runtime`, `lambda.public-url` (function and alias URLs).
 - `--format markdown`: worst-first table for job summaries and PR comments.
 - `examples/github-actions-scheduled-scan.yml`: daily scan over OIDC with a read-only role.
+- `elbv2.http-not-redirected` (default action only) and `logs.no-retention`.
+- `--skip-check ID` to leave checks out (exact id or service prefix).
+- `--min-severity` to hide lower findings from the report; `--fail-on` still sees all of them.
+- Dependabot (weekly, grouped) for pip and GitHub Actions.
 
 ## 0.2.0
 

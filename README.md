@@ -22,7 +22,9 @@ so it is safe to run against production.
 | `rds.publicly-accessible` | high | region | RDS instances with a public endpoint |
 | `rds.storage-unencrypted` | high | region | RDS instances without storage encryption |
 | `lambda.deprecated-runtime` | medium | region | functions on runtimes AWS no longer patches (python3.8, nodejs16.x, go1.x, ...) |
-| `lambda.public-url` | high | region | function URLs with `AuthType NONE` (anyone can invoke) |
+| `lambda.public-url` | high | region | function or alias URLs with `AuthType NONE` (anyone can invoke) |
+| `elbv2.http-not-redirected` | medium | region | ALB HTTP listeners that serve traffic instead of redirecting to HTTPS |
+| `logs.no-retention` | low | region | CloudWatch log groups that never expire (shows GiB stored) |
 | `iam.root-mfa` | critical | global | root user without MFA |
 | `iam.access-key-old` | medium | global | active access keys older than 90 days |
 | `iam.access-key-unused` | medium | global | active access keys unused for 90 days (or never used) |
@@ -51,6 +53,10 @@ aws-audit scan --all-regions
 # only some checks (exact id or service prefix)
 aws-audit scan --region eu-west-1 --check ec2
 aws-audit scan --region eu-west-1 --check s3.public-access
+
+# everything except some checks, and only show medium or worse
+aws-audit scan --region eu-west-1 --skip-check logs --skip-check ec2.unattached-eip
+aws-audit scan --region eu-west-1 --min-severity medium
 
 # JSON for other tools
 aws-audit scan --region eu-west-1 --format json > findings.json
@@ -88,6 +94,7 @@ instead of stopping the scan.
 | 2 | bad arguments, no region, or credentials/API failure before the scan |
 
 Use `--fail-on critical` to only fail on the worst findings, or `--fail-on none` to always exit 0.
+`--min-severity` only filters what is printed; `--fail-on` always looks at every finding.
 
 ## Permissions
 
@@ -97,7 +104,8 @@ The AWS managed policy `SecurityAudit` covers every check. The exact calls are:
 `s3:GetAccountPublicAccessBlock`, `s3:GetBucketPublicAccessBlock`, `s3:GetBucketPolicyStatus`,
 `ec2:DescribeAddresses`, `ec2:DescribeSecurityGroups`, `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus`,
 `config:DescribeConfigurationRecorderStatus`, `rds:DescribeDBInstances`, `iam:GetAccountSummary`, `iam:ListUsers`,
-`iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`, `lambda:ListFunctions`, `lambda:ListAliases`, `lambda:GetFunctionUrlConfig`.
+`iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`, `lambda:ListFunctions`, `lambda:ListAliases`, `lambda:GetFunctionUrlConfig`,
+`elasticloadbalancing:DescribeLoadBalancers`, `elasticloadbalancing:DescribeListeners`, `logs:DescribeLogGroups`.
 
 ## Development
 
