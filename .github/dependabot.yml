@@ -1,5 +1,8 @@
 # Weekly dependency updates, grouped so they arrive as one PR per ecosystem.
 # CI (ci-passed) must be green before any of them is merged.
+# pip uses increase-if-necessary so the minimum versions in pyproject.toml
+# (what users need, not what is newest) are only raised when a release
+# no longer satisfies them.
 version: 2
 updates:
   - package-ecosystem: pip
@@ -8,6 +11,7 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
     groups:
       python-deps:
         patterns: ["*"]
