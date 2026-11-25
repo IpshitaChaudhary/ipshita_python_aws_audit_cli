@@ -11,7 +11,13 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from aws_audit import __version__
 from aws_audit.models import Severity
-from aws_audit.output import render_checks, render_json, render_markdown, render_table
+from aws_audit.output import (
+    render_checks,
+    render_json,
+    render_markdown,
+    render_sarif,
+    render_table,
+)
 from aws_audit.registry import all_checks, select_checks
 from aws_audit.runner import ScanResult, enabled_regions, run_scan
 
@@ -54,7 +60,7 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="ID",
         help="check id or service prefix to leave out; repeat for more",
     )
-    scan.add_argument("--format", choices=["table", "json", "markdown"], default="table")
+    scan.add_argument("--format", choices=["table", "json", "markdown", "sarif"], default="table")
     scan.add_argument(
         "--min-severity",
         default="low",
@@ -97,7 +103,12 @@ def _scan(args: argparse.Namespace) -> int:
     hidden = len(result.findings) - len(shown.findings)
     if hidden:
         print(f"aws-audit: {hidden} finding(s) below {min_severity} not shown", file=sys.stderr)
-    renderers = {"table": render_table, "json": render_json, "markdown": render_markdown}
+    renderers = {
+        "table": render_table,
+        "json": render_json,
+        "markdown": render_markdown,
+        "sarif": render_sarif,
+    }
     print(renderers[args.format](shown))
     # --fail-on looks at every finding, so hiding output never hides a failure
     if fail_on is not None and any(f.severity >= fail_on for f in result.findings):
