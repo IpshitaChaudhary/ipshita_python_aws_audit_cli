@@ -144,3 +144,20 @@ def sg_admin_ports(session: boto3.Session, region: str) -> Iterator[Issue]:
                         f"{', '.join(ports)} open to {', '.join(open_to)}",
                         Severity.CRITICAL if rule.get("IpProtocol") == "-1" else None,
                     )
+
+
+@check("ec2.snapshot-public", "EBS snapshots are not shared publicly", Severity.CRITICAL)
+def public_snapshots(session: boto3.Session, region: str) -> Iterator[Issue]:
+    """A public snapshot can be copied into any AWS account, with all its data."""
+    ec2 = session.client("ec2", region_name=region)
+    for page in ec2.get_paginator("describe_snapshots").paginate(OwnerIds=["self"]):
+        for snap in page["Snapshots"]:
+            perms = ec2.describe_snapshot_attribute(
+                SnapshotId=snap["SnapshotId"], Attribute="createVolumePermission"
+            )["CreateVolumePermissions"]
+            if any(p.get("Group") == "all" for p in perms):
+                yield Issue(
+                    _label(snap["SnapshotId"], snap.get("Tags")),
+                    f"{snap['VolumeSize']} GiB snapshot can be restored by any AWS account; "
+                    "remove the public permission",
+                )

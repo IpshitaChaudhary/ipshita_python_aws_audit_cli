@@ -1,6 +1,11 @@
 from conftest import REGION
 
-from aws_audit.checks.ec2 import ebs_default_encryption, imdsv2_not_required, unencrypted_volumes
+from aws_audit.checks.ec2 import (
+    ebs_default_encryption,
+    imdsv2_not_required,
+    public_snapshots,
+    unencrypted_volumes,
+)
 from aws_audit.cli import main
 
 AMI = "ami-12c6146b"  # one of moto's built-in images
@@ -200,3 +205,31 @@ def test_min_severity_hides_output_but_not_failures(aws, capsys):
     # hiding output never hides a failure
     args = ["scan", "--region", REGION, "--check", "ec2.unattached-volume"]
     assert main([*args, "--min-severity", "critical", "--fail-on", "low"]) == 1
+
+
+def test_public_snapshots(aws):
+    ec2 = aws.client("ec2", region_name=REGION)
+    vol = ec2.create_volume(AvailabilityZone=f"{REGION}a", Size=8)["VolumeId"]
+    public = ec2.create_snapshot(
+        VolumeId=vol,
+        TagSpecifications=[{"ResourceType": "snapshot", "Tags": [{"Key": "Name", "Value": "db"}]}],
+    )["SnapshotId"]
+    shared = ec2.create_snapshot(VolumeId=vol)["SnapshotId"]
+    ec2.create_snapshot(VolumeId=vol)  # private
+    ec2.modify_snapshot_attribute(
+        SnapshotId=public,
+        Attribute="createVolumePermission",
+        OperationType="add",
+        GroupNames=["all"],
+    )
+    ec2.modify_snapshot_attribute(  # shared with one account: not public
+        SnapshotId=shared,
+        Attribute="createVolumePermission",
+        OperationType="add",
+        UserIds=["111122223333"],
+    )
+
+    issues = list(public_snapshots(aws, REGION))
+
+    assert [i.resource for i in issues] == [f"{public} (db)"]
+    assert "any AWS account" in issues[0].message
