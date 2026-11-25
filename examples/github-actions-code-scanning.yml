@@ -1,0 +1,45 @@
+# Example: send aws-audit findings to GitHub code scanning (Security tab).
+# Each finding becomes an alert that stays open until the resource is fixed,
+# and closes by itself on the next scan after that. Copy to .github/workflows/.
+#
+# Needs: code scanning available on the repo (public repo, or GitHub Advanced
+# Security), and the same OIDC role as github-actions-scheduled-scan.yml
+# (AWS managed policy SecurityAudit, trust limited to this repo's main branch).
+
+name: aws-audit-code-scanning
+
+on:
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # OIDC to AWS
+  security-events: write # upload SARIF
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install aws-audit
+        run: pip install "git+https://github.com/IpshitaChaudhary/ipshita_python_aws_audit_cli@main"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AUDIT_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - name: Scan
+        # --fail-on none: alerts live in the Security tab, so the run itself
+        # only fails when the scan cannot run at all (exit 2)
+        run: aws-audit scan --all-regions --format sarif --fail-on none > aws-audit.sarif
+
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: aws-audit.sarif
+          category: aws-audit
