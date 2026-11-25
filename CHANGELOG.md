@@ -1,12 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2026-11-25
 
 ### Added
 - `--format sarif` (SARIF 2.1.0) for GitHub code scanning, with stable per-resource fingerprints.
 - `examples/github-actions-code-scanning.yml`: weekly scan uploaded with `upload-sarif`.
 - `ec2.snapshot-public` (critical): EBS snapshots shared with all AWS accounts.
 - `kms.rotation-disabled`: customer-managed symmetric keys without automatic rotation.
+
+### Changed
+- Minimum versions are back to what the code needs: `boto3>=1.34`, `setuptools>=77`
+  (a Dependabot update had raised them to the newest releases).
+- Dependabot keeps those minimums unless a new release requires a change.
+- CI actions updated (`actions/checkout` v7, `actions/setup-python` v7).
 
 ## 0.3.0 - 2026-11-23
 
