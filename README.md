@@ -3,7 +3,7 @@
 [![ci](https://github.com/IpshitaChaudhary/ipshita_python_aws_audit_cli/actions/workflows/ci.yml/badge.svg)](https://github.com/IpshitaChaudhary/ipshita_python_aws_audit_cli/actions/workflows/ci.yml)
 
 `aws-audit` is a small Python CLI that scans an AWS account for common hardening gaps
-and prints them as a table, JSON or Markdown. It only calls read-only APIs (`Describe*`, `List*`, `Get*`),
+and prints them as a table, JSON, Markdown or SARIF. It only calls read-only APIs (`Describe*`, `List*`, `Get*`),
 so it is safe to run against production.
 
 ## Checks
@@ -16,6 +16,7 @@ so it is safe to run against production.
 | `s3.public-access` | high | global | Block Public Access gaps; **critical** when a bucket policy is public and not blocked |
 | `ec2.unattached-eip` | low | region | Elastic IPs not attached to anything (billed while idle) |
 | `ec2.unattached-volume` | low | region | EBS volumes in `available` state (billed while idle) |
+| `ec2.snapshot-public` | critical | region | EBS snapshots any AWS account can restore |
 | `ec2.sg-admin-port-open` | high | region | SSH, RDP or database ports open to `0.0.0.0/0` or `::/0`; **critical** for all-traffic rules |
 | `cloudtrail.region-not-logged` | high | region | no trail, or no *logging* trail, covers the region |
 | `config.recorder-off` | medium | region | AWS Config recorder missing or stopped |
@@ -24,6 +25,7 @@ so it is safe to run against production.
 | `lambda.deprecated-runtime` | medium | region | functions on runtimes AWS no longer patches (python3.8, nodejs16.x, go1.x, ...) |
 | `lambda.public-url` | high | region | function or alias URLs with `AuthType NONE` (anyone can invoke) |
 | `elbv2.http-not-redirected` | medium | region | ALB HTTP listeners that serve traffic instead of redirecting to HTTPS |
+| `kms.rotation-disabled` | medium | region | customer-managed symmetric KMS keys without automatic rotation |
 | `logs.no-retention` | low | region | CloudWatch log groups that never expire (shows GiB stored) |
 | `iam.root-mfa` | critical | global | root user without MFA |
 | `iam.access-key-old` | medium | global | active access keys older than 90 days |
@@ -63,10 +65,18 @@ aws-audit scan --region eu-west-1 --format json > findings.json
 
 # Markdown, e.g. for a GitHub Actions job summary or a PR comment
 aws-audit scan --all-regions --format markdown >> "$GITHUB_STEP_SUMMARY"
+
+# SARIF 2.1.0, for GitHub code scanning
+aws-audit scan --all-regions --format sarif --fail-on none > aws-audit.sarif
 ```
 
 Markdown output sorts findings worst first. For a ready-made daily scan using GitHub OIDC and a
 read-only role, see [`examples/github-actions-scheduled-scan.yml`](examples/github-actions-scheduled-scan.yml).
+
+SARIF output puts each finding in the repo's Security tab as a code scanning alert. Every result
+has a fingerprint of check + region + resource, so a weekly scan keeps one alert per problem and
+closes it once the resource is fixed. See
+[`examples/github-actions-code-scanning.yml`](examples/github-actions-code-scanning.yml).
 
 Example output (a test account with one old instance and one new bucket):
 
@@ -105,7 +115,8 @@ The AWS managed policy `SecurityAudit` covers every check. The exact calls are:
 `ec2:DescribeAddresses`, `ec2:DescribeSecurityGroups`, `cloudtrail:DescribeTrails`, `cloudtrail:GetTrailStatus`,
 `config:DescribeConfigurationRecorderStatus`, `rds:DescribeDBInstances`, `iam:GetAccountSummary`, `iam:ListUsers`,
 `iam:ListAccessKeys`, `iam:GetAccessKeyLastUsed`, `lambda:ListFunctions`, `lambda:ListAliases`, `lambda:GetFunctionUrlConfig`,
-`elasticloadbalancing:DescribeLoadBalancers`, `elasticloadbalancing:DescribeListeners`, `logs:DescribeLogGroups`.
+`elasticloadbalancing:DescribeLoadBalancers`, `elasticloadbalancing:DescribeListeners`, `logs:DescribeLogGroups`,
+`ec2:DescribeSnapshots`, `ec2:DescribeSnapshotAttribute`, `kms:ListKeys`, `kms:DescribeKey`, `kms:GetKeyRotationStatus`.
 
 ## Development
 

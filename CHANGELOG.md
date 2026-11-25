@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `--format sarif` (SARIF 2.1.0) for GitHub code scanning, with stable per-resource fingerprints.
+- `examples/github-actions-code-scanning.yml`: weekly scan uploaded with `upload-sarif`.
+- `ec2.snapshot-public` (critical): EBS snapshots shared with all AWS accounts.
+- `kms.rotation-disabled`: customer-managed symmetric keys without automatic rotation.
+
 ## 0.3.0 - 2026-11-23
 
 ### Added
