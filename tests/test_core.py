@@ -6,7 +6,7 @@ from botocore.exceptions import ClientError
 from aws_audit import registry
 from aws_audit.cli import main
 from aws_audit.models import Issue, Severity
-from aws_audit.output import render_json, render_markdown, render_table
+from aws_audit.output import render_json, render_markdown, render_sarif, render_table
 from aws_audit.registry import Check
 from aws_audit.runner import run_scan
 
@@ -100,6 +100,35 @@ def test_render_markdown_sorts_worst_first_and_escapes_pipes():
 def test_render_markdown_empty():
     md = render_markdown(run_scan(None, ["eu-west-1"], []))
     assert "no findings" in md and "| Severity" not in md
+
+
+def test_render_sarif_rules_results_and_fingerprints():
+    denied = ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "Describe")
+    checks = [
+        _fake("r.bad", Severity.CRITICAL, issues=[("bucket", "open"), ("vol", "open too")]),
+        _fake("r.low", Severity.LOW, issues=[("log", "minor")]),
+        _fake("r.denied", error=denied),
+    ]
+    sarif = json.loads(render_sarif(run_scan(None, ["eu-west-1"], checks)))
+    run = sarif["runs"][0]
+
+    assert sarif["version"] == "2.1.0"
+    assert [r["id"] for r in run["tool"]["driver"]["rules"]] == ["r.bad", "r.low"]
+    levels = {(r["ruleId"], r["level"]) for r in run["results"]}
+    assert levels == {("r.bad", "error"), ("r.low", "note")}
+    for r in run["results"]:
+        assert run["tool"]["driver"]["rules"][r["ruleIndex"]]["id"] == r["ruleId"]
+        assert r["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].startswith("aws/")
+    prints = [r["partialFingerprints"]["awsAuditFinding/v1"] for r in run["results"]]
+    assert len(set(prints)) == 3  # one per resource, stable across runs
+    assert run["invocations"][0]["executionSuccessful"] is False
+    assert "r.denied" in run["invocations"][0]["toolExecutionNotifications"][0]["message"]["text"]
+
+
+def test_render_sarif_empty_is_valid():
+    run = json.loads(render_sarif(run_scan(None, ["eu-west-1"], [])))["runs"][0]
+    assert run["results"] == [] and run["tool"]["driver"]["rules"] == []
+    assert run["invocations"][0]["executionSuccessful"] is True
 
 
 def test_cli_list_checks_and_bad_input(capsys):
